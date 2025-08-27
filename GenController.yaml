@@ -28,19 +28,18 @@ wifi:
     ssid: "Generatorcontroller"
     password: "oQfxQ5doNjPo"
     
-  binary_sensor:
-    - platform: gpio
-      pin: 21
-      id: generator_running
-      name: "Generator Running"
-      device_class: running
-    
-    - platform: template
-      name: "Generator Start Fault"
-      id: generator_start_fault
-      device_class: problem
-      default_state: OFF
-      
+binary_sensor:
+  - platform: gpio
+    pin: 21
+    id: generator_running
+    name: "Generator Running"
+    device_class: running
+  
+  - platform: template
+    name: "Generator Start Fault"
+    id: generator_start_fault
+    device_class: problem
+        
 
 switch:
   - platform: gpio
@@ -75,6 +74,7 @@ number:
     max_value: 10
     step: 1
     unit_of_measurement: "s"
+    optimistic: True
     restore_value: true
     initial_value: 2
 
@@ -85,6 +85,7 @@ number:
     max_value: 5
     step: 0.5
     unit_of_measurement: "s"
+    optimistic: True
     restore_value: true
     initial_value: 1
 
@@ -95,6 +96,7 @@ number:
     max_value: 2
     step: 0.1
     unit_of_measurement: "s"
+    optimistic: True
     restore_value: true
     initial_value: 0.5
 
@@ -103,18 +105,17 @@ button:
     name: "Start Generator"
     id: start_generator
     on_press:
-      if:
+      if:      
         condition:
-          binary_sensor.is_on: generator_running
+          any:
+           - binary_sensor.is_on: generator_running
+           - binary_sensor.is_on: generator_start_fault  
         then:
-          - logger.log: "Generator is already running"
-          - return
-        else if:
-          condition:
-            binary_sensor.is_on: generator_start_fault
-          then:
-            - logger.log: "Generator start fault is active, cannot start generator"
-            - return
+          - logger.log: "Generator cannot start"
+          - logger.log: "Generator Running"
+          - logger.log: generator_running
+          - logger.log: "Generator Faulted"
+          - logger.log: generator_start_fault
         else:
           - logger.log: "Starting generator"
       
@@ -129,37 +130,34 @@ button:
           - switch.turn_on: choke_relay
           - switch.turn_on: starter_relay
           #
-          - delay: 
-            lambda: 'return id(starter_time).state * 1000;'
+          - delay: !lambda 'return id(starter_time).state * 1000;'
           - switch.turn_off: starter_relay
-          #
+          #wait for generator running then turn off the choke 
           - wait_until:
-              binary_sensor.is_on: generator_running
-              timeout:  
-                lambda: 'return id(choke_delay).state * 1000;'
-
-          - switch.turn_off: choke_relay
-          # if the generator is running, turn on the output relay
+              condition:
+                  binary_sensor.is_on: generator_running
+              timeout: 15s
           - if:
               condition:
                 binary_sensor.is_on: generator_running
               then:
-                - logger.log: "Generator started successfully"
+                - delay: !lambda 'return id(choke_delay).state * 1000;'
+                - switch.turn_off: choke_relay
+                - delay: 2s
                 - switch.turn_on: output_relay
               else:
                 - switch.turn_on: kill_switch
+         
+
   - platform: template
     name: "Stop Generator"
     id: stop_generator
     on_press:
       - switch.turn_off: output_relay
-      - delay: 
-        lambda: 'return id(kill_delay).state * 1000;'
+      - delay: !lambda 'return id(kill_delay).state * 1000;'
       - switch.turn_on: kill_switch
-        -delay: 
-          lambda: 'return id(kill_delay).state * 1000;'
+      - delay: !lambda 'return id(kill_delay).state * 1000;'
           
       
 captive_portal:
-    80
     
