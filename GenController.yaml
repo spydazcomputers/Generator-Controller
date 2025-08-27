@@ -1,16 +1,46 @@
 esphome:
-  name: gencontroller
-  platform: ESP32
+  name: generatorcontroller
+  friendly_name: GeneratorController
+
+esp32:
   board: esp32dev
+  framework:
+    type: esp-idf
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "qza8GSkOARmrbuwb8z2xGww6dXice/YJIoDkaeK0WWw="
+
+ota:
+  - platform: esphome
+    password: "aa11f24d588137b900808fb4eb94c25e"
 
 wifi:
-  ssid: "YOUR_WIFI_SSID"
-  password: "YOUR_WIFI_PASSWORD"
-  # Optional manual IP configuration
-  # manual_ip:
-  #   static_ip: 192.168.1.100
-  #   gateway: 192.168.1.1
-  #   subnet: 255.255.255.0
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Generatorcontroller"
+    password: "oQfxQ5doNjPo"
+    
+  binary_sensor:
+    - platform: gpio
+      pin: 21
+      id: generator_running
+      name: "Generator Running"
+      device_class: running
+    
+    - platform: template
+      name: "Generator Start Fault"
+      id: generator_start_fault
+      device_class: problem
+      default_state: OFF
+      
 
 switch:
   - platform: gpio
@@ -37,34 +67,99 @@ switch:
     name: "Kill Switch"
     restore_mode: ALWAYS_OFF
 
+number:
+  - platform: template
+    name: "Starter Time"
+    id: starter_time
+    min_value: 1
+    max_value: 10
+    step: 1
+    unit_of_measurement: "s"
+    restore_value: true
+    initial_value: 2
+
+  - platform: template
+    name: "Choke Delay"
+    id: choke_delay
+    min_value: 0.5
+    max_value: 5
+    step: 0.5
+    unit_of_measurement: "s"
+    restore_value: true
+    initial_value: 1
+
+  - platform: template
+    name: "Kill Delay"
+    id: kill_delay
+    min_value: 0.1
+    max_value: 2
+    step: 0.1
+    unit_of_measurement: "s"
+    restore_value: true
+    initial_value: 0.5
+
 button:
   - platform: template
     name: "Start Generator"
     id: start_generator
     on_press:
-      - switch.turn_on: kill_switch
-      - delay: 500ms
-      - switch.turn_on: choke_relay
-      - delay: 1s
-      - switch.turn_on: starter_relay
-      - delay:
-          lambda: |-
-            return id(starter_time) / 1000.0;
-      - switch.turn_off: starter_relay
-      - wait_until:
+      if:
+        condition:
           binary_sensor.is_on: generator_running
-          timeout: 15s
-      - switch.turn_off: choke_relay
-      - switch.turn_on: output_relay
+        then:
+          - logger.log: "Generator is already running"
+          - return
+        else if:
+          condition:
+            binary_sensor.is_on: generator_start_fault
+          then:
+            - logger.log: "Generator start fault is active, cannot start generator"
+            - return
+        else:
+          - logger.log: "Starting generator"
+      
+          #ensure output relay is off
+          - switch.turn_off: output_relay
+          #ensure starter and choke relays are off
+          - switch.turn_off: starter_relay
+          - switch.turn_off: choke_relay
+          #ensure kill switch is off
+          - switch.turn_off: kill_switch
+          #activate choke and starter relays
+          - switch.turn_on: choke_relay
+          - switch.turn_on: starter_relay
+          #
+          - delay: 
+            lambda: 'return id(starter_time).state * 1000;'
+          - switch.turn_off: starter_relay
+          #
+          - wait_until:
+              binary_sensor.is_on: generator_running
+              timeout:  
+                lambda: 'return id(choke_delay).state * 1000;'
 
+          - switch.turn_off: choke_relay
+          # if the generator is running, turn on the output relay
+          - if:
+              condition:
+                binary_sensor.is_on: generator_running
+              then:
+                - logger.log: "Generator started successfully"
+                - switch.turn_on: output_relay
+              else:
+                - switch.turn_on: kill_switch
   - platform: template
     name: "Stop Generator"
     id: stop_generator
     on_press:
       - switch.turn_off: output_relay
-      - switch.turn_off: choke_relay
-      - switch.turn_off: starter_relay
-      - wait_until:
-          binary_sensor.is_off: generator_running
-          timeout: 20s
-      - switch.turn_off: kill_switch
+      - delay: 
+        lambda: 'return id(kill_delay).state * 1000;'
+      - switch.turn_on: kill_switch
+        -delay: 
+          lambda: 'return id(kill_delay).state * 1000;'
+          
+      
+captive_portal:
+    80
+    
