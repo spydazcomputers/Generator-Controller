@@ -1,0 +1,70 @@
+esphome:
+  name: gencontroller
+  platform: ESP32
+  board: esp32dev
+
+wifi:
+  ssid: "YOUR_WIFI_SSID"
+  password: "YOUR_WIFI_PASSWORD"
+  # Optional manual IP configuration
+  # manual_ip:
+  #   static_ip: 192.168.1.100
+  #   gateway: 192.168.1.1
+  #   subnet: 255.255.255.0
+
+switch:
+  - platform: gpio
+    pin: 16
+    id: choke_relay
+    name: "Choke Relay"
+    restore_mode: ALWAYS_OFF
+
+  - platform: gpio
+    pin: 17
+    id: starter_relay
+    name: "Starter Relay"
+    restore_mode: ALWAYS_OFF
+
+  - platform: gpio
+    pin: 18
+    id: output_relay
+    name: "Output Relay"
+    restore_mode: ALWAYS_OFF
+
+  - platform: gpio
+    pin: 19
+    id: kill_switch
+    name: "Kill Switch"
+    restore_mode: ALWAYS_OFF
+
+button:
+  - platform: template
+    name: "Start Generator"
+    id: start_generator
+    on_press:
+      - switch.turn_on: kill_switch
+      - delay: 500ms
+      - switch.turn_on: choke_relay
+      - delay: 1s
+      - switch.turn_on: starter_relay
+      - delay:
+          lambda: |-
+            return id(starter_time) / 1000.0;
+      - switch.turn_off: starter_relay
+      - wait_until:
+          binary_sensor.is_on: generator_running
+          timeout: 15s
+      - switch.turn_off: choke_relay
+      - switch.turn_on: output_relay
+
+  - platform: template
+    name: "Stop Generator"
+    id: stop_generator
+    on_press:
+      - switch.turn_off: output_relay
+      - switch.turn_off: choke_relay
+      - switch.turn_off: starter_relay
+      - wait_until:
+          binary_sensor.is_off: generator_running
+          timeout: 20s
+      - switch.turn_off: kill_switch
