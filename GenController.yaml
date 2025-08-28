@@ -3,7 +3,7 @@ esphome:
   friendly_name: GeneratorController
 
 esp32:
-  board: esp32dev
+  board: esp32-c6-devkitc-1
   framework:
     type: esp-idf
 
@@ -28,45 +28,111 @@ wifi:
     ssid: "Generatorcontroller"
     password: "oQfxQ5doNjPo"
 
-# i2c scanner for accelerometer
-# i2c:
-#   sda: GPIO21
-#   scl: GPIO22
-#   scan: true
+
+# Analog input for sensing generator running light level. 
+# This is then used to determine if the generator is running or not.
+# Publishes to the binary sensor "Generator Running" when above the set level.
+# The level can be adjusted in Home Assistant via the "Running Light Level" number entity.
+# Clears the binary sensor when the light level drops below the set level minus a small hysteresis.
+
+sensor:
+  - platform: adc
+    pin: 3
+    id: generator_light_level
+    attenuation: auto
+    name: "Generator Output LED"
+    on_value_range:
+      - above: !lambda 'return id(light_level_switch).state;'
+        then: 
+          - lambda: id(generator_running).publish_state(true);
+      - below: !lambda 'return id(light_level_switch).state - .2;'
+        then:
+          - lambda: id(generator_running).publish_state(false);
+    update_interval: 100ms  
+
 
 binary_sensor:
-  - platform: gpio
-    pin: 21
+  # sensor to indicate if the generator is running
+  - platform: template
     id: generator_running
     name: "Generator Running"
     device_class: running
   
+  # sensor to indicate a fault in starting the generator
   - platform: template
     name: "Generator Start Fault"
     id: generator_start_fault
     device_class: problem
     publish_initial_state: True
+
+  # GPIO buttons to receive RF remote commands via a 433MHz receiver module
+  # These buttons simulate the pressing of physical buttons connected to the ESP32
+  # Each button press triggers the corresponding action via the button components defined below
+  - platform: gpio
+    pin: 
+      number: 4
+      mode: 
+        input: true
+        pullup: True
+    id: RF_GenStart
+    name: "RF Gen Start Command"
+    device_class: running
+    on_release: 
+      then:
+        - button.press: start_generator
+
+  - platform: gpio
+    pin: 
+      number: 5
+      mode: 
+        input: true
+        pullup: True
+    id: RF_GenStop
+    name: "RF Gen Stop Command"
+    device_class: running 
+    on_release: 
+      then:
+        - button.press: stop_generator 
+
+  - platform: gpio
+    pin: 
+      number: 8
+      mode: 
+        input: true
+        pullup: True
+    name: "RF Reset"
+    device_class: power
+    on_release: 
+      then:
+        - button.press: remote_restart
+  
+  
+   
         
 
 switch:
+  # Choke relay enables the choke on the generator
   - platform: gpio
-    pin: 17
+    pin: 10
     id: choke_relay
     name: "Choke Relay"
     restore_mode: ALWAYS_OFF
 
+  # Starter relay engages the starter motor on the generator
   - platform: gpio
-    pin: 18
+    pin: 11
     id: starter_relay
     name: "Starter Relay"
     restore_mode: ALWAYS_OFF
 
+  # Output relay enables the output from the generator to the load
   - platform: gpio
     pin: 22
     id: output_relay
     name: "Output Relay"
     restore_mode: ALWAYS_OFF
 
+  # Kill switch relay grounds the ignition system to stop the generator 
   - platform: gpio
     pin: 23
     id: kill_switch
@@ -74,40 +140,64 @@ switch:
     restore_mode: ALWAYS_OFF
 
 number:
+  # Start time is how long to engage the starter motor
   - platform: template
     name: "Starter Time"
     id: starter_time
     min_value: 1
-    max_value: 10
+    max_value: 15
     step: 1
     unit_of_measurement: "s"
     optimistic: True
     restore_value: true
     initial_value: 2
 
+  # Choke delay is how long to wait after the generator is running before turning off the choke
   - platform: template
     name: "Choke Delay"
     id: choke_delay
     min_value: 0.5
-    max_value: 5
-    step: 0.5
+    max_value: 30
+    step: 1
     unit_of_measurement: "s"
     optimistic: True
     restore_value: true
-    initial_value: 1
-
+    initial_value: 5
+  # Kill delay is how long to hold the kill switch on when stopping the generator
   - platform: template
     name: "Kill Delay"
     id: kill_delay
-    min_value: 0.1
-    max_value: 2
-    step: 0.1
+    min_value: 5
+    max_value: 30
+    step: 1
     unit_of_measurement: "s"
     optimistic: True
     restore_value: true
-    initial_value: 0.5
+    initial_value: 5
+
+  # Light level switch is the voltage level at which the generator running light is considered on
+  - platform: template
+    name: "Running Light Level"
+    id: light_level_switch
+    min_value: 0
+    max_value: 3.0
+    step: .01
+    unit_of_measurement: "V"
+    optimistic: true
+    restore_value: true
+    initial_value: 1.5
 
 button:
+  #Restart button to restart the ESP32 activated via RF remote or web interface
+  - platform: restart
+    id: remote_restart
+    name: "Restart"
+
+  #Button to start the generator
+  #This button is activated via RF remote or web interface
+  #The logic ensures the generator is not already running or faulted before attempting to start
+  #If the generator fails to start within the timeout period, it activates the kill switch and sets a fault state
+  #If the generator starts successfully, it turns off the choke after a delay and then enables the output relay
   - platform: template
     name: "Start Generator"
     id: start_generator
@@ -156,9 +246,18 @@ button:
                 - switch.turn_on: kill_switch
                 - logger.log: "Start Failed"
                 - lambda: id(generator_start_fault).publish_state(true);
+                - switch.turn_off: choke_relay
+                - delay: !lambda 'return id(kill_delay).state * 1000;'
+                - switch.turn_off: kill_switch
               
                
         
+  #Button to stop the generator
+  #This button is activated via RF remote or web interface
+  #The logic DOES NOT CHECK IF the generator is running before attempting to stop
+  #It turns off the output relay, then activates the kill switch for a set delay to stop the generator
+  #Finally, it ensures the choke and starter relays are off
+  #This ensures the generator is fully stopped regardless of its initial state
 
   - platform: template
     name: "Stop Generator"
@@ -169,8 +268,11 @@ button:
       - switch.turn_on: kill_switch
       - delay: !lambda 'return id(kill_delay).state * 1000;'
       - switch.turn_off: kill_switch
+      - switch.turn_off: choke_relay
+      - switch.turn_off: starter_relay
 
   #Resets all faults and Relays to startup
+  #Activated onboot, local reset button or via web interface
   - platform: template
     name: "Reset"
     id: reset_button
@@ -184,42 +286,6 @@ button:
           
 
 
-
-# sensor:
-#   - platform: mpu6050
-#     accel_x:
-#       id: accel_x
-#     accel_y:
-#       id: accel_y
-#     accel_z:
-#       id: accel_z
-#     update_interval: 50ms # Fast updates to catch quick vibrations
-#     address: 0x68
-
-#   # Template sensor to calculate the magnitude of the acceleration vector
-#   - platform: template
-#     name: "Acceleration Magnitude"
-#     id: accel_magnitude
-#     unit_of_measurement: 'm/s²'
-#     lambda: |-
-#       return sqrt(pow(id(accel_x).state, 2) + pow(id(accel_y).state, 2) + pow(id(accel_z).state, 2));
-#     filters:
-#       # Use a median filter to remove random spikes
-#       - median:
-#           window_size: 5
-#           send_every: 3
-#           send_first_at: 1
-#       # Only publish significant changes to avoid constant state updates
-#       - threshold: 0.5
-#   - platform: analog_threshold  
-#     name: "Abnormal Vibration Detected"
-#     sensor_id: accel_magnitude
-#     threshold: 12.0 # Set a value higher than normal operation
-#     filters:
-#       # Prevent false triggers from a single spike
-#       - delayed_on: 1s
-#       # Ensure the alert persists for a minimum duration
-#       - delayed_off: 5s
       
 captive_portal:
 
