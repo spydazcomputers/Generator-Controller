@@ -27,7 +27,13 @@ wifi:
   ap:
     ssid: "Generatorcontroller"
     password: "oQfxQ5doNjPo"
-    
+
+# i2c scanner for accelerometer
+# i2c:
+#   sda: GPIO21
+#   scl: GPIO22
+#   scan: true
+
 binary_sensor:
   - platform: gpio
     pin: 21
@@ -39,29 +45,30 @@ binary_sensor:
     name: "Generator Start Fault"
     id: generator_start_fault
     device_class: problem
+    publish_initial_state: True
         
 
 switch:
   - platform: gpio
-    pin: 16
+    pin: 17
     id: choke_relay
     name: "Choke Relay"
     restore_mode: ALWAYS_OFF
 
   - platform: gpio
-    pin: 17
+    pin: 18
     id: starter_relay
     name: "Starter Relay"
     restore_mode: ALWAYS_OFF
 
   - platform: gpio
-    pin: 18
+    pin: 22
     id: output_relay
     name: "Output Relay"
     restore_mode: ALWAYS_OFF
 
   - platform: gpio
-    pin: 19
+    pin: 23
     id: kill_switch
     name: "Kill Switch"
     restore_mode: ALWAYS_OFF
@@ -113,9 +120,9 @@ button:
         then:
           - logger.log: "Generator cannot start"
           - logger.log: "Generator Running"
-          - logger.log: generator_running
+          - logger.log: id(generator_running).state
           - logger.log: "Generator Faulted"
-          - logger.log: generator_start_fault
+          - logger.log: id(generator_start_fault).state
         else:
           - logger.log: "Starting generator"
       
@@ -147,7 +154,11 @@ button:
                 - switch.turn_on: output_relay
               else:
                 - switch.turn_on: kill_switch
-         
+                - logger.log: "Start Failed"
+                - lambda: id(generator_start_fault).publish_state(true);
+              
+               
+        
 
   - platform: template
     name: "Stop Generator"
@@ -157,7 +168,61 @@ button:
       - delay: !lambda 'return id(kill_delay).state * 1000;'
       - switch.turn_on: kill_switch
       - delay: !lambda 'return id(kill_delay).state * 1000;'
+      - switch.turn_off: kill_switch
+
+  #Resets all faults and Relays to startup
+  - platform: template
+    name: "Reset"
+    id: reset_button
+    on_press:
+      - lambda: id(generator_start_fault).publish_state(false);
+      - switch.turn_off: starter_relay
+      - switch.turn_off: output_relay
+      - switch.turn_off: choke_relay
+      - switch.turn_off: kill_switch
+
           
+
+
+
+# sensor:
+#   - platform: mpu6050
+#     accel_x:
+#       id: accel_x
+#     accel_y:
+#       id: accel_y
+#     accel_z:
+#       id: accel_z
+#     update_interval: 50ms # Fast updates to catch quick vibrations
+#     address: 0x68
+
+#   # Template sensor to calculate the magnitude of the acceleration vector
+#   - platform: template
+#     name: "Acceleration Magnitude"
+#     id: accel_magnitude
+#     unit_of_measurement: 'm/s²'
+#     lambda: |-
+#       return sqrt(pow(id(accel_x).state, 2) + pow(id(accel_y).state, 2) + pow(id(accel_z).state, 2));
+#     filters:
+#       # Use a median filter to remove random spikes
+#       - median:
+#           window_size: 5
+#           send_every: 3
+#           send_first_at: 1
+#       # Only publish significant changes to avoid constant state updates
+#       - threshold: 0.5
+#   - platform: analog_threshold  
+#     name: "Abnormal Vibration Detected"
+#     sensor_id: accel_magnitude
+#     threshold: 12.0 # Set a value higher than normal operation
+#     filters:
+#       # Prevent false triggers from a single spike
+#       - delayed_on: 1s
+#       # Ensure the alert persists for a minimum duration
+#       - delayed_off: 5s
       
 captive_portal:
+
+web_server:
+  
     
