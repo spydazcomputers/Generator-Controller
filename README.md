@@ -9,22 +9,25 @@ This project provides an ESPHome-based controller for automating the start-up an
 - **Output Monitoring:** Uses a light sensor to detect the generator's output status via the output indicator light.
 - **Configurable Parameters:** Starter activation time and other settings can be adjusted via ESPHome configuration.
 - **Remote Control & Monitoring:** Integrates with Home Assistant for remote operation and status updates.
+- **Remote Web Monitoring** No Home assistant required. If used without home assitant disable API in code
 
 ## Hardware Requirements
 
-- ESP8266 or ESP32 microcontroller
+- ESP8266 or ESP32 microcontroller (This project was created on a BEVR 4 Channel ESP32C6 development board)
+- RF Remote with reciever (This project used a reciever with Logic level outputs RX480-E4 and corresponding remote). 
 - Predator 3500 generator
-- Relay or actuator for choke control
-- Relay for starter activation
-- Light sensor (e.g., LDR or photodiode) positioned on the generator's output light
+- Actuator for choke control (12V car door 2 wire solenoid)
+- Photo Resistor positioned on the generator's output light
 - Power supply for ESP device
 
 ## Setup
 
 1. Connect the choke and starter actuators to the ESP device via relays.
 2. Mount the light sensor on the generator's output indicator light.
-3. Flash the ESP device with the provided ESPHome configuration.
-4. Integrate with Home Assistant for remote control and monitoring.
+3. Wire Photodiode to the appropriate GPIO
+4. Wire the RF Reciever to the Appropriate GPIO points
+4. Flash the ESP device with the provided ESPHome configuration.
+5. Integrate with Home Assistant for remote control and monitoring.
 
 ## Configuration
 
