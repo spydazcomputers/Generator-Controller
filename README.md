@@ -23,7 +23,9 @@ This project provides an ESPHome-based controller for automating the start-up an
 ![Choke Actuator](Resources/choke%20actuator.jpg)
 ![Choke Cable](Resources/choke%20cable.jpg)
 ![RF Remote](Resources/RF%20Remote.jpg)
-![Watch the video](https://img.youtube.com/vi/s34Ymtdg5oo?si=azYu55Z9kUYumMLs/maxresdefault.jpg)](https://youtu.be/s34Ymtdg5oo?si=azYu55Z9kUYumMLs)
+## Watch The Videos!
+[![Watch the video](https://i.ytimg.com/vi/s34Ymtdg5oo/maxresdefault.jpg)](https://youtu.be/s34Ymtdg5oo?si=azYu55Z9kUYumMLs)
+
 
 ## Setup
 
