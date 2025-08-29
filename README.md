@@ -23,6 +23,7 @@ This project provides an ESPHome-based controller for automating the start-up an
 ![Choke Actuator](Resources/choke%20actuator.jpg)
 ![Choke Cable](Resources/choke%20cable.jpg)
 ![RF Remote](Resources/RF%20Remote.jpg)
+![Test Video 1](https://youtu.be/s34Ymtdg5oo?si=azYu55Z9kUYumMLs)
 ## Setup
 
 1. Connect the choke and starter actuators to the ESP device via relays.
