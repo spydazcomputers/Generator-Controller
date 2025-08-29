@@ -19,7 +19,10 @@ This project provides an ESPHome-based controller for automating the start-up an
 - Actuator for choke control (12V car door 2 wire solenoid)
 - Photo Resistor positioned on the generator's output light
 - Power supply for ESP device
-
+![BEVR 4 Channel ESP32C6 Development Board](Resources/BEVR.jpg)
+![Choke Actuator](Resources/choke%20actuator.jpg)
+![Choke Cable](Resources/choke%20cable.jpg)
+![RF Remote](Resources/RF%20remote.jpg)
 ## Setup
 
 1. Connect the choke and starter actuators to the ESP device via relays.
