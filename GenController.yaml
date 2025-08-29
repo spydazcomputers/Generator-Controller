@@ -48,7 +48,9 @@ sensor:
       - below: !lambda 'return id(light_level_switch).state - .2;'
         then:
           - lambda: id(generator_running).publish_state(false);
-    update_interval: 100ms  
+    update_interval: 1000ms
+    web_server:
+      sorting_group_id: sorting_group_status
 
 
 binary_sensor:
@@ -57,6 +59,8 @@ binary_sensor:
     id: generator_running
     name: "Generator Running"
     device_class: running
+    web_server:
+      sorting_group_id: sorting_group_status
   
   # sensor to indicate a fault in starting the generator
   - platform: template
@@ -64,6 +68,8 @@ binary_sensor:
     id: generator_start_fault
     device_class: problem
     publish_initial_state: True
+    web_server:
+      sorting_group_id: sorting_group_status
 
   # GPIO buttons to receive RF remote commands via a 433MHz receiver module
   # These buttons simulate the pressing of physical buttons connected to the ESP32
@@ -80,6 +86,8 @@ binary_sensor:
     on_release: 
       then:
         - button.press: start_generator
+    web_server:
+      sorting_group_id: sorting_group_status
 
   - platform: gpio
     pin: 
@@ -93,6 +101,8 @@ binary_sensor:
     on_release: 
       then:
         - button.press: stop_generator 
+    web_server:
+      sorting_group_id: sorting_group_status    
 
   - platform: gpio
     pin: 
@@ -105,6 +115,8 @@ binary_sensor:
     on_release: 
       then:
         - button.press: remote_restart
+    web_server:
+      sorting_group_id: sorting_group_status
   
   
    
@@ -117,6 +129,8 @@ switch:
     id: choke_relay
     name: "Choke Relay"
     restore_mode: ALWAYS_OFF
+    web_server:
+      sorting_group_id: sorting_group_manual
 
   # Starter relay engages the starter motor on the generator
   - platform: gpio
@@ -124,6 +138,8 @@ switch:
     id: starter_relay
     name: "Starter Relay"
     restore_mode: ALWAYS_OFF
+    web_server:
+      sorting_group_id: sorting_group_manual
 
   # Output relay enables the output from the generator to the load
   - platform: gpio
@@ -131,6 +147,8 @@ switch:
     id: output_relay
     name: "Output Relay"
     restore_mode: ALWAYS_OFF
+    web_server:
+      sorting_group_id: sorting_group_manual
 
   # Kill switch relay grounds the ignition system to stop the generator 
   - platform: gpio
@@ -138,6 +156,8 @@ switch:
     id: kill_switch
     name: "Kill Switch"
     restore_mode: ALWAYS_OFF
+    web_server:
+      sorting_group_id: sorting_group_manual
 
 number:
   # Start time is how long to engage the starter motor
@@ -151,6 +171,8 @@ number:
     optimistic: True
     restore_value: true
     initial_value: 2
+    web_server:
+      sorting_group_id: sorting_group_number_settings
 
   # Choke delay is how long to wait after the generator is running before turning off the choke
   - platform: template
@@ -163,6 +185,8 @@ number:
     optimistic: True
     restore_value: true
     initial_value: 5
+    web_server:
+      sorting_group_id: sorting_group_number_settings
   # Kill delay is how long to hold the kill switch on when stopping the generator
   - platform: template
     name: "Kill Delay"
@@ -174,7 +198,8 @@ number:
     optimistic: True
     restore_value: true
     initial_value: 5
-
+    web_server:
+      sorting_group_id: sorting_group_number_settings
   # Light level switch is the voltage level at which the generator running light is considered on
   - platform: template
     name: "Running Light Level"
@@ -186,12 +211,16 @@ number:
     optimistic: true
     restore_value: true
     initial_value: 1.5
+    web_server:
+      sorting_group_id: sorting_group_number_settings
 
 button:
   #Restart button to restart the ESP32 activated via RF remote or web interface
   - platform: restart
     id: remote_restart
     name: "Restart"
+    web_server:
+      sorting_group_id: sorting_group_switches
 
   #Button to start the generator
   #This button is activated via RF remote or web interface
@@ -201,6 +230,8 @@ button:
   - platform: template
     name: "Start Generator"
     id: start_generator
+    web_server:
+      sorting_group_id: sorting_group_switches
     on_press:
       if:      
         condition:
@@ -262,6 +293,8 @@ button:
   - platform: template
     name: "Stop Generator"
     id: stop_generator
+    web_server:
+      sorting_group_id: sorting_group_switches
     on_press:
       - switch.turn_off: output_relay
       - delay: !lambda 'return id(kill_delay).state * 1000;'
@@ -276,6 +309,8 @@ button:
   - platform: template
     name: "Reset"
     id: reset_button
+    web_server:
+      sorting_group_id: sorting_group_switches
     on_press:
       - lambda: id(generator_start_fault).publish_state(false);
       - switch.turn_off: starter_relay
@@ -290,5 +325,19 @@ button:
 captive_portal:
 
 web_server:
+  version: 3
+  sorting_groups:
+  - id: sorting_group_status
+    name: "Status"
+    sorting_weight: 10
+  - id: sorting_group_switches
+    name: "Buttons"
+    sorting_weight: 20    
+  - id: sorting_group_number_settings
+    name: "Number settings"
+    sorting_weight: 30
+  - id: sorting_group_manual
+    name: "Manual Relay Control"
+    sorting_weight: 40  
   
     
