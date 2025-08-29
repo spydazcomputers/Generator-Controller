@@ -22,7 +22,7 @@ This project provides an ESPHome-based controller for automating the start-up an
 ![BEVR 4 Channel ESP32C6 Development Board](Resources/BEVR.jpg)
 ![Choke Actuator](Resources/choke%20actuator.jpg)
 ![Choke Cable](Resources/choke%20cable.jpg)
-![RF Remote](Resources/RF%20remote.jpg)
+![RF Remote](Resources/RF%20Remote.jpg)
 ## Setup
 
 1. Connect the choke and starter actuators to the ESP device via relays.
